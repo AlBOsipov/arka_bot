@@ -216,7 +216,7 @@ def handle_user_input(update: Update, context: CallbackContext):
                     reason_discount_rejection = offer['DiscountStatus']['RejectionReasons']['Reason']['Descr']
                     context.bot.send_message(
                         chat_id=update.effective_chat.id,
-                        text=f"ВНИМАНИЕ! Объект публикуется на ДомКлик, но нет скидки!"
+                        text=f"ВНИМАНИЕ! Объект публикуется на ДомКлик, но нет скидки! \n"
                              f"Причина: {reason_discount_rejection}"
                     )
                 else:
