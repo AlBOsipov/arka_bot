@@ -60,9 +60,9 @@ jobs:
             echo TOKEN_CIAN=${{ secrets.TOKEN_CIAN }} >> .env
             echo TOKEN_DOMCLICK=${{ secrets.TOKEN_DOMCLICK }} >> .env
             echo AVITO_ID_COMPANY=${{ secrets.AVITO_ID_COMPANY }} >> .env
-            echo AVITO_ID_COMPANY=${{ secrets.YANDEX_TOKEN }} >> .env
-            echo AVITO_ID_COMPANY=${{ secrets.YANDEX_X_TOKEN }} >> .env
-            echo AVITO_ID_COMPANY=${{ secrets.YANDEX_FEED_ID }} >> .env
+            echo YANDEX_TOKEN=${{ secrets.YANDEX_TOKEN }} >> .env
+            echo YANDEX_X_TOKEN=${{ secrets.YANDEX_X_TOKEN }} >> .env
+            echo YANDEX_FEED_ID=${{ secrets.YANDEX_FEED_ID }} >> .env
             docker run -d abosipov/arka_bot:latest 
 
 
