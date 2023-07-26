@@ -147,7 +147,7 @@ def handle_user_input(update: Update, context: CallbackContext):
                     error = offer.get("errors", "Неизвестная ошибка.")
                     context.bot.send_message(chat_id=update.effective_chat.id, text=f"Есть ошибка на CIAN: {error}")
 
-    # Handle YANDEX input
+    # Handle YANDEX input 
     yandex_headers = {
         'Authorization': f'OAuth {YANDEX_TOKEN}',
         'X-Authorization': f'Vertis {YANDEX_X_TOKEN}'
