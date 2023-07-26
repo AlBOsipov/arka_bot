@@ -1,1 +1,77 @@
 
+name: Telegram-app workflow
+
+on: [push]
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: 3.8
+
+  build_and_push_to_docker_hub:
+    name: Push Docker images to Docker Hub
+    runs-on: ubuntu-latest
+    needs: tests
+
+    steps:
+    - name: Check out the repo
+      uses: actions/checkout@v2
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v1
+        
+    - name: Login to Docker
+      uses: docker/login-action@v1
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+
+    - name: Push backend Docker image to Docker Hub
+      uses: docker/build-push-action@v2
+      with:
+
+        file: ./Dockerfile
+        push: true
+        tags: abosipov/arka_bot:v1
+
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build_and_push_to_docker_hub
+    steps:
+      - name: executing remote ssh commands to deploy
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USER }}
+          key: ${{ secrets.SSH_KEY }}
+          passphrase: ${{ secrets.PASSPHRASE }}
+          script: |
+            touch .env
+            echo AVITO_CLIENT_ID=${{ secrets.AVITO_CLIENT_ID }} >> .env
+            echo AVITO_CLIENT_SECRET=${{ secrets.AVITO_CLIENT_SECRET }} >> .env
+            echo TELEGRAM_TOKEN_AVITO=${{ secrets.TELEGRAM_TOKEN_AVITO }} >> .env
+            echo TOKEN_CIAN=${{ secrets.TOKEN_CIAN }} >> .env
+            echo TOKEN_DOMCLICK=${{ secrets.TOKEN_DOMCLICK }} >> .env
+            echo AVITO_ID_COMPANY=${{ secrets.AVITO_ID_COMPANY }} >> .env
+            echo AVITO_ID_COMPANY=${{ secrets.YANDEX_TOKEN }} >> .env
+            echo AVITO_ID_COMPANY=${{ secrets.YANDEX_X_TOKEN }} >> .env
+            echo AVITO_ID_COMPANY=${{ secrets.YANDEX_FEED_ID }} >> .env
+
+
+  send_message:
+    runs-on: ubuntu-latest
+    needs: deploy
+    steps:
+    - name: send message
+      uses: appleboy/telegram-action@master
+      with:
+        to: ${{ secrets.TELEGRAM_TO }}
+        token: ${{ secrets.TELEGRAM_TOKEN }}
+        message: ${{ github.workflow }} успешно выполнен!
