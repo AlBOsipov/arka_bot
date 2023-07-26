@@ -38,7 +38,7 @@ jobs:
 
         file: ./Dockerfile
         push: true
-        tags: abosipov/arka_bot:v1
+        tags: abosipov/arka_bot:v2
 
 
   deploy:
@@ -63,6 +63,7 @@ jobs:
             echo AVITO_ID_COMPANY=${{ secrets.YANDEX_TOKEN }} >> .env
             echo AVITO_ID_COMPANY=${{ secrets.YANDEX_X_TOKEN }} >> .env
             echo AVITO_ID_COMPANY=${{ secrets.YANDEX_FEED_ID }} >> .env
+            python3 arka_bot.py
 
 
   send_message:
