@@ -8,6 +8,6 @@ RUN pip install --upgrade pip
 
 RUN pip3 install -r ./requirements.txt --no-cache-dir
 
-COPY arka_bot.py .
+COPY . .
 
-CMD ["python", "arka_bot.py"]
+CMD ["python3", "arka_bot.py"]
