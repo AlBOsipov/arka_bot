@@ -34,7 +34,7 @@ URL_GET_AVITO_ID_LISTING = 'https://api.avito.ru/autoload/v2/items/avito_ids?que
 URL_GET_AVITO_URL = f'https://api.avito.ru/core/v1/accounts/{AVITO_ID_COMPANY}/items/'
 URL_GET_YANDEX_FEED = 'https://api.realty.yandex.net/2.0/crm/offers'
 URL_GET_CIAN_FEED = 'https://public-api.cian.ru/v1/get-order'
-
+URL_GET_DOMCLICK_REPORT = 'https://my.domclick.ru/api/v1/company/238126/report/'
 
 # Глобальная переменная для хранения токена
 global_token = None
@@ -70,7 +70,7 @@ def get_id_avito(user_input):
             global_id_avito = items[0].get('avito_id')
 
 
-def get_item_status(global_avito_id):
+def get_item_avito_status(global_avito_id):
     """Получаение статуса на авито."""
     global global_token
     url = f'{URL_GET_AVITO_URL}{global_avito_id}/'
@@ -87,152 +87,201 @@ def get_item_status(global_avito_id):
     return None
 
 
-def start(update: Update, context: CallbackContext):
-    context.bot.send_message(
-        chat_id=update.effective_chat.id, text="Введите номер листинга."
-    )
-
-
-def handle_user_input(update: Update, context: CallbackContext):
-    user_input = update.message.text.strip()
+def handle_avito_input(
+        update: Update, context: CallbackContext, user_input: str):
+    """Получени ссылки с Авито."""
     global global_token
-
-    # Handle Avito input
     if global_token is None:
         if not get_new_token():
-            context.bot.send_message(
-                chat_id=update.effective_chat.id,
-                text="Не удалось получить токен. Попробуйте позже."
-            )
+            send_message(
+                update, context,
+                "Не удалось получить токен Avito. Попробуйте позже.")
             return
 
-    if user_input.isdigit() and len(user_input) == 5:
-        get_id_avito(user_input)
+    get_id_avito(user_input)
 
-        if global_id_avito:
-            url = get_item_status(global_id_avito)
-            if url:
-                context.bot.send_message(
-                    chat_id=update.effective_chat.id,
-                    text=f"{GREEN_CHECKMARK} Ваше объявление на Avito успешно публикуется: {url}")
-            else:
-                context.bot.send_message(
-                    chat_id=update.effective_chat.id,
-                    text=f"{RED_CROSS} Объявление на Avito не активно или не найдено."
-                )
+    if global_id_avito:
+        url = get_item_avito_status(global_id_avito)
+        if url:
+            send_message(
+                update, context,
+                f"{GREEN_CHECKMARK} Ваше объявление на Avito успешно "
+                f"публикуется: {url}")
         else:
-            context.bot.send_message(chat_id=update.effective_chat.id, text=f"{RED_CROSS} Объявление на Avito не найдено.")
+            send_message(
+                update, context,
+                f"{RED_CROSS} Объявление на Avito не активно или не найдено.")
     else:
-        context.bot.send_message(chat_id=update.effective_chat.id, text="Введите ровно 5 цифр листинга на Avito.")
+        send_message(
+            update, context, f"{RED_CROSS} Объявление на Avito не найдено.")
 
-    # Handle CIAN input
+
+def handle_cian_input(
+        update: Update, context: CallbackContext, user_input: str):
+    """Получени ссылки с Циан."""
     cian_headers = {'Authorization': f'Bearer {TOKEN_CIAN}'}
     cian_params = {"externalId": user_input}
 
-    response_cian = requests.get(URL_GET_CIAN_FEED, headers=cian_headers, params=cian_params)
+    response_cian = requests.get(
+        URL_GET_CIAN_FEED, headers=cian_headers, params=cian_params)
     data = response_cian.json()
 
-    if response_cian.status_code == 200 and "result" in data and "offers" in data["result"]:
+    if (response_cian.status_code == 200 and
+            "result" in data and "offers" in data["result"]):
         offers = data["result"]["offers"]
 
+        found_cian_offer = False
         for offer in offers:
             if offer["externalId"] == user_input:
+                found_cian_offer = True
                 if offer["status"] == "Published":
                     url = offer["url"]
-                    context.bot.send_message(
-                        chat_id=update.effective_chat.id,
-                        text=f"{GREEN_CHECKMARK} Ваше объявление на CIAN успешно публикуется: {url}"
-                    )
+                    send_message(
+                        update, context,
+                        f"{GREEN_CHECKMARK} Ваше объявление на CIAN успешно "
+                        f"публикуется: {url}")
                 else:
                     error = offer.get("errors", "Неизвестная ошибка.")
-                    context.bot.send_message(chat_id=update.effective_chat.id, text=f"Есть ошибка на CIAN: {error}")
+                    send_message(
+                        update, context, f"Есть ошибка на CIAN: {error}")
+        if not found_cian_offer:
+            send_message(
+                update, context, f"{RED_CROSS} Объект не найден ЦИАН!")
 
-    # Handle YANDEX input 
+
+def handle_yandex_input(
+        update: Update, context: CallbackContext, user_input: str):
+    """Получени ссылки с Яндекс."""
     yandex_headers = {
         'Authorization': f'OAuth {YANDEX_TOKEN}',
         'X-Authorization': f'Vertis {YANDEX_X_TOKEN}'
     }
     yandex_params = {"feedId": YANDEX_FEED_ID}
 
-    response_yandex = requests.get(URL_GET_YANDEX_FEED, headers=yandex_headers, params=yandex_params)
+    response_yandex = requests.get(
+        URL_GET_YANDEX_FEED, headers=yandex_headers, params=yandex_params)
 
     if response_yandex.status_code == 200:
         try:
             data = response_yandex.json()
             listing_snippets = data.get("listing", {}).get("snippets", [])
-            
-            # Поиск объекта с соответствующим значением internalId
+            found_ya_offer = False
             for snippet in listing_snippets:
                 offer = snippet.get("offer", {})
                 internal_id = offer.get("internalId")
                 if internal_id == user_input and not offer.get("state"):
+                    found_ya_offer = True
                     url = offer.get("url")
-                    context.bot.send_message(
-                        chat_id=update.effective_chat.id,
-                        text=f"{GREEN_CHECKMARK} Ваше объявление на Яндекс успешно публикуется: {url}"
-                    )
+                    send_message(
+                        update, context,
+                        f"{GREEN_CHECKMARK} Ваше объявление "
+                        f"на Яндекс успешно публикуется: {url}")
                 elif internal_id == user_input and offer.get("state"):
                     state_errors = offer.get("state")
                     get_errors = state_errors.get("errors")
                     erros_list = []
                     for error in get_errors:
                         error_type = error["type"]
-                        if ya_error_lib[error_type]:
+                        if ya_error_lib.get(error_type):
                             error_text = ya_error_lib[error_type]
                             erros_list.append(error_text)
                         else:
                             new_error = 'Неизвестная ошибка'
                             erros_list.append(new_error)
-                    context.bot.send_message(
-                        chat_id=update.effective_chat.id,
-                        text=f"{RED_CROSS} Объект не публикуется на Яндекс! "
-                             f"Причина: {erros_list}"
+                    send_message(
+                        update, context,
+                        f"{RED_CROSS} Объект не публикуется на Яндекс! \n"
+                        f"Причина: {', '.join(erros_list)}"
                     )
+            if not found_ya_offer:
+                send_message(
+                    update, context, f"{RED_CROSS} Объект не найден Яндекс!")
         except ValueError:
-            context.bot.send_message(
-                chat_id=update.effective_chat.id,
-                text="Некорректный JSON-ответ от эндпоинта.")
+            send_message(
+                update, context, "Некорректный JSON-ответ от эндпоинта.")
     else:
-        context.bot.send_message(
-            chat_id=update.effective_chat.id,
-            text="Ошибка при выполнении запроса на эндпоинт.")
+        send_message(
+            update, context, "Ошибка при выполнении запроса на эндпоинт.")
 
-    # Handle DomClick input
-    domclick_url = f'https://my.domclick.ru/api/v1/company/238126/report/'
+
+def handle_domclick_input(
+        update: Update, context: CallbackContext, user_input: str):
+    """Получени ссылки с ДомКлик."""
     domclick_headers = {'Authorization': f'Token {TOKEN_DOMCLICK}'}
 
-    domclick_response = requests.get(domclick_url, headers=domclick_headers)
+    domclick_response = requests.get(
+        URL_GET_DOMCLICK_REPORT, headers=domclick_headers)
 
     if domclick_response.status_code == 200:
         xml_data = domclick_response.content
         data_dict = xmltodict.parse(xml_data)
+        found_dom_offer = False
 
         for offer in data_dict['Report']['OfferList']['Offer']:
             external_id_node = offer.get('ExternalId')
-            if external_id_node == user_input and offer['Status']['Code'] == 'published':
+            if (external_id_node == user_input and
+                    offer['Status']['Code'] == 'published'):
                 domclick_url_node = offer['Publication']['DomclickURL']
                 discount_status = offer['DiscountStatus']['Code']
                 if discount_status == 'rejected':
+                    found_dom_offer = True
                     reason_discount_rejection = offer['DiscountStatus']['RejectionReasons']['Reason']['Descr']
-                    context.bot.send_message(
-                        chat_id=update.effective_chat.id,
-                        text=f"ВНИМАНИЕ! Объект публикуется на ДомКлик, но нет скидки! \n"
-                             f"Причина: {reason_discount_rejection}"
+                    send_message(
+                        update, context,
+                        f"ВНИМАНИЕ! Объект публикуется на ДомКлик, "
+                        f"но нет скидки!\n"
+                        f"Причина: {reason_discount_rejection}"
                     )
                 else:
-                    context.bot.send_message(
-                        chat_id=update.effective_chat.id,
-                        text=f"{GREEN_CHECKMARK} Объект успешно публикуется "
-                             f"на Домклик: {domclick_url_node}"
+                    found_dom_offer = True
+                    send_message(
+                        update, context,
+                        f"{GREEN_CHECKMARK} Объект успешно публикуется на "
+                        f"Домклик: {domclick_url_node}"
                     )
+        if not found_dom_offer:
+            send_message(
+                update, context, f"{RED_CROSS} Объект не найден ДомКлик!")
+    else:
+        send_message(
+            update, context, f"Системная ошибка на стороне ДомКлик. \n"
+            f"Держите код: {domclick_response.status_code} \n"
+            f"Он вряд ли вам что-то скажет, но пусть будет."
+        )
+
+
+def start(update: Update, context: CallbackContext):
+    send_message(update, context, "Введите номер листинга.")
+
+
+def send_message(update: Update, context: CallbackContext, text: str):
+    context.bot.send_message(chat_id=update.effective_chat.id, text=text)
+
+
+def is_valid_user_input(user_input: str) -> bool:
+    """Проверка вводимого значения."""
+    return user_input.isdigit() and len(user_input) == 5
+
+
+def handle_user_input(update: Update, context: CallbackContext):
+    """Менеджер проврки ссылок на площадках."""
+    user_input = update.message.text.strip()
+
+    if not is_valid_user_input(user_input):
+        send_message(update, context, "Введите ровно 5 цифр листинга.")
 
     else:
-        context.bot.send_message(
-            chat_id=update.effective_chat.id,
-            text=f"Системная ошибка на стороне ДомКлик. "
-                 f"Держите код: {domclick_response.status_code} "
-                 f"Он врядли вам что-то скажет, но пусть будет."
-        )
+        # Handle Avito input
+        handle_avito_input(update, context, user_input)
+
+        # Handle CIAN input
+        handle_cian_input(update, context, user_input)
+
+        # Handle Yandex input
+        handle_yandex_input(update, context, user_input)
+
+        # Handle DomClick input
+        handle_domclick_input(update, context, user_input)
 
 
 def main():

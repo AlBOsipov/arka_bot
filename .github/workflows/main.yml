@@ -53,8 +53,9 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           passphrase: ${{ secrets.PASSPHRASE }}
           script: |
+            docker stop
             touch .env
-            echo AVITO_CLIENT_ID=${{ secrets.AVITO_CLIENT_ID }} >> .env
+            echo AVITO_CLIENT_ID=${{ secrets.AVITO_CLIENT_ID }} > .env
             echo AVITO_CLIENT_SECRET=${{ secrets.AVITO_CLIENT_SECRET }} >> .env
             echo TELEGRAM_TOKEN_AVITO=${{ secrets.TELEGRAM_TOKEN_AVITO }} >> .env
             echo TOKEN_CIAN=${{ secrets.TOKEN_CIAN }} >> .env
@@ -63,7 +64,7 @@ jobs:
             echo YANDEX_TOKEN=${{ secrets.YANDEX_TOKEN }} >> .env
             echo YANDEX_X_TOKEN=${{ secrets.YANDEX_X_TOKEN }} >> .env
             echo YANDEX_FEED_ID=${{ secrets.YANDEX_FEED_ID }} >> .env
-            docker run -d abosipov/arka_bot:latest 
+            docker run -d --env-file /root/.env abosipov/arka_bot:latest
 
 
   send_message:
