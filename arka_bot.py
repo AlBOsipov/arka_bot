@@ -24,17 +24,20 @@ AVITO_ID_COMPANY = os.getenv('AVITO_ID_COMPANY')
 TOKEN_CIAN = os.getenv('TOKEN_CIAN')
 
 TOKEN_DOMCLICK = os.getenv('TOKEN_DOMCLICK')
+DOMCLICK_ID_COMPANY = os.getenv('DOMCLICK_ID_COMPANY')
 
 YANDEX_TOKEN = os.getenv('YANDEX_TOKEN')
 YANDEX_X_TOKEN = os.getenv('YANDEX_X_TOKEN')
 YANDEX_FEED_ID = os.getenv('YANDEX_FEED_ID')
+
+
 
 URL_GET_AVITO_TOKEN = 'https://api.avito.ru/token/'
 URL_GET_AVITO_ID_LISTING = 'https://api.avito.ru/autoload/v2/items/avito_ids?query='
 URL_GET_AVITO_URL = f'https://api.avito.ru/core/v1/accounts/{AVITO_ID_COMPANY}/items/'
 URL_GET_YANDEX_FEED = 'https://api.realty.yandex.net/2.0/crm/offers'
 URL_GET_CIAN_FEED = 'https://public-api.cian.ru/v1/get-order'
-URL_GET_DOMCLICK_REPORT = 'https://my.domclick.ru/api/v1/company/238126/report/'
+URL_GET_DOMCLICK_REPORT = f'https://my.domclick.ru/api/v1/company/{DOMCLICK_ID_COMPANY}/report/'
 
 # Глобальная переменная для хранения токена
 global_token = None
@@ -107,10 +110,6 @@ def handle_avito_input(
                 update, context,
                 f"{GREEN_CHECKMARK} Ваше объявление на Avito успешно "
                 f"публикуется: {url}")
-        else:
-            send_message(
-                update, context,
-                f"{RED_CROSS} Объявление на Avito не активно или не найдено.")
     else:
         send_message(
             update, context, f"{RED_CROSS} Объявление на Avito не найдено.")
