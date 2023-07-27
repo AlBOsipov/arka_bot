@@ -1,6 +1,7 @@
 import os
 import requests
 import xmltodict
+import logging
 
 from telegram import Update
 from telegram.ext import (Updater, CommandHandler, MessageHandler,
@@ -11,6 +12,11 @@ from yandex_errors_dict import ya_error_lib
 
 load_dotenv()
 
+logging.basicConfig(
+    filename='app.log',  # Имя файла для записи логов
+    level=logging.INFO,  # Уровень логирования
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 
 GREEN_CHECKMARK = "✅"
 RED_CROSS = "❌"
@@ -31,7 +37,6 @@ YANDEX_X_TOKEN = os.getenv('YANDEX_X_TOKEN')
 YANDEX_FEED_ID = os.getenv('YANDEX_FEED_ID')
 
 
-
 URL_GET_AVITO_TOKEN = 'https://api.avito.ru/token/'
 URL_GET_AVITO_ID_LISTING = 'https://api.avito.ru/autoload/v2/items/avito_ids?query='
 URL_GET_AVITO_URL = f'https://api.avito.ru/core/v1/accounts/{AVITO_ID_COMPANY}/items/'
@@ -42,6 +47,9 @@ URL_GET_DOMCLICK_REPORT = f'https://my.domclick.ru/api/v1/company/{DOMCLICK_ID_C
 # Глобальная переменная для хранения токена
 global_token = None
 global_id_avito = None
+
+
+
 
 
 def get_new_token():
@@ -71,6 +79,10 @@ def get_id_avito(user_input):
         items = data.get('items')
         if items:
             global_id_avito = items[0].get('avito_id')
+    else:
+        logging.warning(
+            "Ошибка при выполнении запроса на стороне Авито. Код ответа: %s",
+            response.status_code)
 
 
 def get_item_avito_status(global_avito_id):
@@ -86,6 +98,9 @@ def get_item_avito_status(global_avito_id):
         if status == "active":
             return data.get('url')
         else:
+            logging.warning(
+                "Ошибка при выполнении запроса на стороне Авито. Код ответа: %s",
+                response.status_code)
             return None
     return None
 
@@ -146,6 +161,10 @@ def handle_cian_input(
         if not found_cian_offer:
             send_message(
                 update, context, f"{RED_CROSS} Объект не найден ЦИАН!")
+    else:
+        logging.warning(
+            "Ошибка при выполнении запроса на стороне Циан. Код ответа: %s",
+            response_cian.status_code)
 
 
 def handle_yandex_input(
@@ -199,6 +218,9 @@ def handle_yandex_input(
             send_message(
                 update, context, "Некорректный JSON-ответ от эндпоинта.")
     else:
+        logging.warning(
+            "Ошибка при выполнении запроса на стороне Циан. Код ответа: %s",
+            response_yandex.status_code)
         send_message(
             update, context, "Ошибка при выполнении запроса на эндпоинт.")
 
@@ -242,6 +264,9 @@ def handle_domclick_input(
             send_message(
                 update, context, f"{RED_CROSS} Объект не найден ДомКлик!")
     else:
+        logging.warning(
+            "Ошибка при выполнении запроса на стороне ДомКлик. Код ответа: %s",
+            domclick_response.status_code)
         send_message(
             update, context, f"Системная ошибка на стороне ДомКлик. \n"
             f"Держите код: {domclick_response.status_code} \n"
@@ -265,14 +290,13 @@ def is_valid_user_input(user_input: str) -> bool:
 def handle_user_input(update: Update, context: CallbackContext):
     """Менеджер проврки ссылок на площадках."""
     user_input = update.message.text.strip()
+    logging.info("Пользователь ввел: %s", user_input)
+    # logging.debug("Ответ от API: %s", data)
 
     if not is_valid_user_input(user_input):
         send_message(update, context, "Введите ровно 5 цифр листинга.")
 
     else:
-        # Handle Avito input
-        handle_avito_input(update, context, user_input)
-
         # Handle CIAN input
         handle_cian_input(update, context, user_input)
 
@@ -281,6 +305,9 @@ def handle_user_input(update: Update, context: CallbackContext):
 
         # Handle DomClick input
         handle_domclick_input(update, context, user_input)
+
+        # Handle Avito input
+        handle_avito_input(update, context, user_input)
 
 
 def main():
