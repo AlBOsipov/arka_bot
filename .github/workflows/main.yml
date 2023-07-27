@@ -38,7 +38,7 @@ jobs:
 
         file: ./Dockerfile
         push: true
-        tags: abosipov/arka_bot:v5
+        tags: abosipov/arka_bot:latest
 
 
   deploy:
@@ -53,7 +53,7 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           passphrase: ${{ secrets.PASSPHRASE }}
           script: |
-            docker stop
+            docker ps -q | xargs docker stop
             touch .env
             echo AVITO_CLIENT_ID=${{ secrets.AVITO_CLIENT_ID }} > .env
             echo AVITO_CLIENT_SECRET=${{ secrets.AVITO_CLIENT_SECRET }} >> .env
@@ -65,7 +65,7 @@ jobs:
             echo YANDEX_X_TOKEN=${{ secrets.YANDEX_X_TOKEN }} >> .env
             echo YANDEX_FEED_ID=${{ secrets.YANDEX_FEED_ID }} >> .env
             echo DOMCLICK_ID_COMPANY=${{ secrets.DOMCLICK_ID_COMPANY }} >> .env
-            docker run -d --env-file /root/.env abosipov/arka_bot:v5
+            docker run -d --env-file /root/.env abosipov/arka_bot:latest
 
 
   send_message:

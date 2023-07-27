@@ -49,9 +49,6 @@ global_token = None
 global_id_avito = None
 
 
-
-
-
 def get_new_token():
     """Обновление токена авито."""
     global global_token
