@@ -95,11 +95,12 @@ def get_item_avito_status(global_avito_id):
         if status == "active":
             return data.get('url')
         else:
-            logging.warning(
-                "Ошибка при выполнении запроса на стороне Авито. Код ответа: %s",
-                response.status_code)
             return None
-    return None
+    else:
+        logging.warning(
+            "Ошибка при выполнении запроса на стороне Авито. Код ответа: %s",
+            response.status_code)
+        return None
 
 
 def handle_avito_input(
