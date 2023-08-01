@@ -76,6 +76,13 @@ def get_id_avito(user_input):
         items = data.get('items')
         if items:
             global_id_avito = items[0].get('avito_id')
+    elif response.status_code == 403:
+        if get_new_token():
+            return get_id_avito(user_input)
+        else:
+            logging.warning(
+                "Ошибка при выполнении запроса на стороне Авито. "
+                "Код ответа: %s", response)
     else:
         logging.warning(
             "Ошибка при выполнении запроса на стороне Авито. Код ответа: %s",
