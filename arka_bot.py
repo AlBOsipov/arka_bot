@@ -38,15 +38,19 @@ YANDEX_FEED_ID = os.getenv('YANDEX_FEED_ID')
 
 
 URL_GET_AVITO_TOKEN = 'https://api.avito.ru/token/'
-URL_GET_AVITO_ID_LISTING = 'https://api.avito.ru/autoload/v2/items/avito_ids?query='
-URL_GET_AVITO_URL = f'https://api.avito.ru/core/v1/accounts/{AVITO_ID_COMPANY}/items/'
+URL_GET_AVITO_ID_LISTING = (
+    'https://api.avito.ru/autoload/v2/items/avito_ids?query=')
+URL_GET_AVITO_URL = (
+    f'https://api.avito.ru/core/v1/accounts/{AVITO_ID_COMPANY}/items/')
 URL_GET_YANDEX_FEED = 'https://api.realty.yandex.net/2.0/crm/offers'
 URL_GET_CIAN_FEED = 'https://public-api.cian.ru/v1/get-order'
-URL_GET_DOMCLICK_REPORT = f'https://my.domclick.ru/api/v1/company/{DOMCLICK_ID_COMPANY}/report/'
+URL_GET_DOMCLICK_REPORT = (
+    f'https://my.domclick.ru/api/v1/company/{DOMCLICK_ID_COMPANY}/report/')
 
-# Глобальная переменная для хранения токена
+# Глобальные переменные
 global_token = None
 global_id_avito = None
+global_found_ya_offer = False
 
 
 def get_new_token():
@@ -71,11 +75,13 @@ def get_id_avito(user_input):
     url = f'{URL_GET_AVITO_ID_LISTING}{user_input}'
     headers = {'Authorization': f'Bearer {global_token}'}
     response = requests.get(url, headers=headers)
+
     if response.status_code == 200:
         data = response.json()
         items = data.get('items')
         if items:
             global_id_avito = items[0].get('avito_id')
+
     elif response.status_code == 403:
         if get_new_token():
             return get_id_avito(user_input)
@@ -94,8 +100,8 @@ def get_item_avito_status(global_avito_id):
     global global_token
     url = f'{URL_GET_AVITO_URL}{global_avito_id}/'
     headers = {'Authorization': f'Bearer {global_token}'}
-
     response = requests.get(url, headers=headers)
+
     if response.status_code == 200:
         data = response.json()
         status = data.get('status')
@@ -114,6 +120,7 @@ def handle_avito_input(
         update: Update, context: CallbackContext, user_input: str):
     """Получени ссылки с Авито."""
     global global_token
+
     if global_token is None:
         if not get_new_token():
             send_message(
@@ -148,8 +155,8 @@ def handle_cian_input(
     if (response_cian.status_code == 200 and
             "result" in data and "offers" in data["result"]):
         offers = data["result"]["offers"]
-
         found_cian_offer = False
+
         for offer in offers:
             if offer["externalId"] == user_input:
                 found_cian_offer = True
@@ -172,59 +179,90 @@ def handle_cian_input(
             response_cian.status_code)
 
 
+def process_yandex_response(response_yandex, user_input, update, context):
+    global global_found_ya_offer
+    try:
+        data = response_yandex.json()
+        listing_snippets = data.get("listing", {}).get("snippets", [])
+
+        for snippet in listing_snippets:
+            offer = snippet.get("offer", {})
+            internal_id = offer.get("internalId")
+
+            if internal_id == user_input and not offer.get("state"):
+                global_found_ya_offer = True
+                url = offer.get("url")
+                send_message(
+                    update, context,
+                    f"{GREEN_CHECKMARK} Ваше объявление "
+                    f"на Яндекс успешно публикуется: {url}")
+
+            elif internal_id == user_input and offer.get("state"):
+                state_errors = offer.get("state")
+                get_errors = state_errors.get("errors")
+                errors_list = []
+
+                for error in get_errors:
+                    error_type = error["type"]
+                    if ya_error_lib.get(error_type):
+                        error_text = ya_error_lib[error_type]
+                        errors_list.append(error_text)
+                    else:
+                        new_error = 'Неизвестная ошибка'
+                        errors_list.append(new_error)
+
+                send_message(
+                    update, context,
+                    f"{RED_CROSS} Объект не публикуется на Яндекс! \n"
+                    f"Причина: {', '.join(errors_list)}"
+                )
+    except ValueError:
+        send_message(update, context, "Некорректный JSON-ответ от эндпоинта.")
+
+
 def handle_yandex_input(
         update: Update, context: CallbackContext, user_input: str):
-    """Получени ссылки с Яндекс."""
+    """Получение ссылки с Яндекс."""
     yandex_headers = {
         'Authorization': f'OAuth {YANDEX_TOKEN}',
         'X-Authorization': f'Vertis {YANDEX_X_TOKEN}'
     }
     yandex_params = {"feedId": YANDEX_FEED_ID}
+    global global_found_ya_offer
 
     response_yandex = requests.get(
         URL_GET_YANDEX_FEED, headers=yandex_headers, params=yandex_params)
+    if global_found_ya_offer:
+        send_message(
+            update, context,
+            f"{RED_CROSS} Объект не найден на Яндекс."
+        )
+        global_found_ya_offer = False
 
-    if response_yandex.status_code == 200:
-        try:
-            data = response_yandex.json()
-            listing_snippets = data.get("listing", {}).get("snippets", [])
-            found_ya_offer = False
-            for snippet in listing_snippets:
-                offer = snippet.get("offer", {})
-                internal_id = offer.get("internalId")
-                if internal_id == user_input and not offer.get("state"):
-                    found_ya_offer = True
-                    url = offer.get("url")
-                    send_message(
-                        update, context,
-                        f"{GREEN_CHECKMARK} Ваше объявление "
-                        f"на Яндекс успешно публикуется: {url}")
-                elif internal_id == user_input and offer.get("state"):
-                    state_errors = offer.get("state")
-                    get_errors = state_errors.get("errors")
-                    erros_list = []
-                    for error in get_errors:
-                        error_type = error["type"]
-                        if ya_error_lib.get(error_type):
-                            error_text = ya_error_lib[error_type]
-                            erros_list.append(error_text)
-                        else:
-                            new_error = 'Неизвестная ошибка'
-                            erros_list.append(new_error)
-                    send_message(
-                        update, context,
-                        f"{RED_CROSS} Объект не публикуется на Яндекс! \n"
-                        f"Причина: {', '.join(erros_list)}"
-                    )
-            if not found_ya_offer:
+    elif response_yandex.status_code == 200:
+        process_yandex_response(response_yandex, user_input, update, context)
+        total = response_yandex.json()['listing']['slicing']['total']
+        offset = 100
+
+        while offset < total:
+            yandex_params["offset"] = f"{offset}"
+            response_yandex = requests.get(
+                URL_GET_YANDEX_FEED,
+                headers=yandex_headers,
+                params=yandex_params
+            )
+            if response_yandex.status_code == 200:
+                process_yandex_response(
+                    response_yandex, user_input, update, context)
+            else:
                 send_message(
-                    update, context, f"{RED_CROSS} Объект не найден Яндекс!")
-        except ValueError:
-            send_message(
-                update, context, "Некорректный JSON-ответ от эндпоинта.")
+                    update, context,
+                    "Ошибка при выполнении запроса на эндпоинт."
+                )
+            offset += 100
     else:
         logging.warning(
-            "Ошибка при выполнении запроса на стороне Циан. Код ответа: %s",
+            "Код отличный от 200: %s",
             response_yandex.status_code)
         send_message(
             update, context, "Ошибка при выполнении запроса на эндпоинт.")
@@ -296,7 +334,6 @@ def handle_user_input(update: Update, context: CallbackContext):
     """Менеджер проврки ссылок на площадках."""
     user_input = update.message.text.strip()
     logging.info("Пользователь ввел: %s", user_input)
-    # logging.debug("Ответ от API: %s", data)
 
     if not is_valid_user_input(user_input):
         send_message(update, context, "Введите ровно 5 цифр листинга.")
