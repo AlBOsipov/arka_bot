@@ -201,6 +201,7 @@ def process_yandex_response(response_yandex, user_input, update, context):
                 state_errors = offer.get("state")
                 get_errors = state_errors.get("errors")
                 errors_list = []
+                global_found_ya_offer = True
 
                 for error in get_errors:
                     error_type = error["type"]
@@ -229,17 +230,12 @@ def handle_yandex_input(
     }
     yandex_params = {"feedId": YANDEX_FEED_ID}
     global global_found_ya_offer
+    global_found_ya_offer = False
 
     response_yandex = requests.get(
         URL_GET_YANDEX_FEED, headers=yandex_headers, params=yandex_params)
-    if global_found_ya_offer:
-        send_message(
-            update, context,
-            f"{RED_CROSS} Объект не найден на Яндекс."
-        )
-        global_found_ya_offer = False
 
-    elif response_yandex.status_code == 200:
+    if response_yandex.status_code == 200:
         process_yandex_response(response_yandex, user_input, update, context)
         total = response_yandex.json()['listing']['slicing']['total']
         offset = 100
@@ -266,6 +262,12 @@ def handle_yandex_input(
             response_yandex.status_code)
         send_message(
             update, context, "Ошибка при выполнении запроса на эндпоинт.")
+    if not global_found_ya_offer:
+        send_message(
+            update, context,
+            f"{RED_CROSS} Объект не найден на Яндекс."
+        )
+        global_found_ya_offer = False
 
 
 def handle_domclick_input(
