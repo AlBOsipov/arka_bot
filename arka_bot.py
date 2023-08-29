@@ -2,6 +2,7 @@ import os
 import requests
 import xmltodict
 import logging
+from datetime import datetime, timedelta
 
 from telegram import Update
 from telegram.ext import (Updater, CommandHandler, MessageHandler,
@@ -20,6 +21,9 @@ logging.basicConfig(
 
 GREEN_CHECKMARK = "✅"
 RED_CROSS = "❌"
+PHONE = "📞"
+HEART = "❤️"
+MAGNIFYING_GLASS = "🔎"
 
 TELEGRAM_TOKEN_AVITO = os.getenv('TELEGRAM_TOKEN_AVITO')
 
@@ -42,6 +46,9 @@ URL_GET_AVITO_ID_LISTING = (
     'https://api.avito.ru/autoload/v2/items/avito_ids?query=')
 URL_GET_AVITO_URL = (
     f'https://api.avito.ru/core/v1/accounts/{AVITO_ID_COMPANY}/items/')
+URL_GET_AVITO_STATS = (
+    f'https://api.avito.ru/stats/v1/accounts/{AVITO_ID_COMPANY}/items')
+
 URL_GET_YANDEX_FEED = 'https://api.realty.yandex.net/2.0/crm/offers'
 URL_GET_CIAN_FEED = 'https://public-api.cian.ru/v1/get-order'
 URL_GET_DOMCLICK_REPORT = (
@@ -116,6 +123,52 @@ def get_item_avito_status(global_avito_id):
         return None
 
 
+def get_avito_stats():
+    """Получение статистики по объекту на авито."""
+    global global_token
+    global global_id_avito
+    headers = {'Authorization': f'Bearer {global_token}'}
+    current_date = datetime.now()
+    date_from = current_date - timedelta(days=30)
+
+    request_body = {
+        "dateFrom": date_from.strftime('%Y-%m-%d'),
+        "dateTo": current_date.strftime('%Y-%m-%d'),
+        "fields": [
+            "uniqViews",
+            "uniqContacts",
+            "uniqFavorites"
+        ],
+        "itemIds": [
+            global_id_avito
+        ],
+        "periodGrouping": "month"
+    }
+
+    response = requests.post(
+        URL_GET_AVITO_STATS, json=request_body, headers=headers)
+
+    if response.status_code == 200:
+        data = response.json()
+        # Извлекаем значения статистики из JSON
+        stats_items = data.get("result", {}).get("items", [])
+        if stats_items:
+            stats = stats_items[0].get("stats", [])[0]
+            uniq_contacts = stats.get("uniqContacts")
+            uniq_favorites = stats.get("uniqFavorites")
+            uniq_views = stats.get("uniqViews")
+
+            # Возвращаем полученные значения
+            return uniq_contacts, uniq_favorites, uniq_views
+        else:
+            return None, None, None  # Если статистика не найдена
+    else:
+        logging.warning(
+            "Ошибка при выполнении запроса на стороне Авито. Код ответа: %s",
+            response.status_code)
+        return None, None, None
+
+
 def handle_avito_input(
         update: Update, context: CallbackContext, user_input: str):
     """Получени ссылки с Авито."""
@@ -129,13 +182,17 @@ def handle_avito_input(
             return
 
     get_id_avito(user_input)
-
     if global_id_avito:
+        contacts, favorites, views = get_avito_stats()
         url = get_item_avito_status(global_id_avito)
         if url:
             send_message(
                 update, context,
-                f"{GREEN_CHECKMARK} Ваше объявление на Avito успешно "
+                f"{GREEN_CHECKMARK} Статистика по объекту за месяц: \n"
+                f"{PHONE} Запросили контакт: {contacts}\n"
+                f"{HEART} Добавили в избранное: {favorites}\n"
+                f"{MAGNIFYING_GLASS} Просмотров карточки: {views}\n"
+                f"{GREEN_CHECKMARK} Ваше объявление на Avito успешно \n"
                 f"публикуется: {url}")
     else:
         send_message(
