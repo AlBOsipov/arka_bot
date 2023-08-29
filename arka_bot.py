@@ -312,7 +312,7 @@ def handle_domclick_input(
         logging.warning(
             "Ошибка при выполнении запроса на стороне ДомКлик. Код ответа: %s",
             domclick_response.status_code)
-        send_message(
+        return send_message(
             update, context, f"Системная ошибка на стороне ДомКлик. \n"
             f"Держите код: {domclick_response.status_code} \n"
             f"Он вряд ли вам что-то скажет, но пусть будет."
@@ -333,25 +333,37 @@ def is_valid_user_input(user_input: str) -> bool:
 
 
 def handle_user_input(update: Update, context: CallbackContext):
-    """Менеджер проврки ссылок на площадках."""
+    """Менеджер проверки ссылок на площадках."""
     user_input = update.message.text.strip()
     logging.info("Пользователь ввел: %s", user_input)
 
     if not is_valid_user_input(user_input):
         send_message(update, context, "Введите ровно 5 цифр листинга.")
-
     else:
-        # Handle CIAN input
-        handle_cian_input(update, context, user_input)
+        try:
+            # Handle CIAN input
+            handle_cian_input(update, context, user_input)
+        except Exception as cian_error:
+            logging.error("Ошибка при обработке CIAN: %s", str(cian_error))
 
-        # Handle Yandex input
-        handle_yandex_input(update, context, user_input)
+        try:
+            # Handle Yandex input
+            handle_yandex_input(update, context, user_input)
+        except Exception as yandex_error:
+            logging.error("Ошибка при обработке Yandex: %s", str(yandex_error))
 
-        # Handle DomClick input
-        handle_domclick_input(update, context, user_input)
+        try:
+            # Handle Avito input
+            handle_avito_input(update, context, user_input)
+        except Exception as avito_error:
+            logging.error("Ошибка при обработке Avito: %s", str(avito_error))
 
-        # Handle Avito input
-        handle_avito_input(update, context, user_input)
+        try:
+            # Handle DomClick input
+            handle_domclick_input(update, context, user_input)
+        except Exception as domclick_error:
+            logging.error(
+                "Ошибка при обработке DomClick: %s", str(domclick_error))
 
 
 def main():
